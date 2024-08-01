@@ -1,0 +1,322 @@
+---
+title: "Annual temperature"
+author: "Dr. Chih-Yu Hung"
+date: "2024-07-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse); library(data.table)
+
+Temp <- fread("../US data/Climate Normals/Temperature_perCounty.csv", header = TRUE)
+Temp <- Temp %>%
+   separate(County_State, into = c("County", "State"), sep = " - ")
+
+```
+
+## Write a function to calculate avg. temperature
+
+```{r funtion for the work}
+Temp.avg <- function (county, state, s.year, f.year) {
+  years <- c(s.year:f.year) 
+  pattern <- paste0("T_(", paste(years, collapse = "|"), ")", ".*")
+  matching_columns <- grep(pattern, names(Temp), value = TRUE)
+
+  # Correct variable names and matching logic
+  city.t <- subset(Temp, County == paste0(county, " County") & State == state)
+  if (nrow(city.t) == 0) {
+    return(NA)  # Return NA if no matching row is found
+  }
+
+  # Ensure subsetting columns correctly
+  city.t <- city.t[, matching_columns]
+
+  # Convert to numeric
+  city.t.numeric <- as.numeric(unlist(city.t))
+
+  # Calculate the mean
+  city.avg <- mean(city.t.numeric, na.rm = TRUE)
+  return(city.avg)
+}
+
+```
+
+
+  County <- as.character(county)
+  State <- as.character(state)
+  #s.year <- as.numeric(s.year)
+  #f.year <- as.numeric(f.year)
+
+## To obtain annual temperature for our mini meta analysis. 
+
+```{r Al-Kaisi et al., 2020}
+#In this study the experiment period is 2002 fall -2014 fall
+years <- c(2003:2014) #exclude 2002
+pattern <- paste0("T_(", paste(years, collapse = "|"), ")", ".*")
+matching_columns <- grep(pattern, names(Temp), value = TRUE)
+
+#1. Sutherland, O'Brien County, Iowa
+# Find the row where County is "O'Brien" and State is "Iowa"
+Sutherland <- subset(Temp, County == "O'Brien County" & State == "Iowa")
+# Find the columns for 2003 to 2014
+Sutherland <- Sutherland[, c("County", "State", matching_columns)]
+Sutherland.avg <- mean(as.numeric(Sutherland[3:length(Sutherland)])) #8.08
+
+
+#2. Kanawha, Hancock County, Iowa
+# Find the row where County is "Hancock" and State is "Iowa"
+Kanawha <- subset(Temp, County == "Hancock County" & State == "Iowa")
+# Find the columns for 2002 to 2014
+Kanawha <- Kanawha[, c("County", "State", matching_columns)]
+Kanawha.avg <- mean(as.numeric(Kanawha[3:length(Kanawha)])) #7.59
+
+#3. Nashua, Chickasaw  County, Iowa
+# Find the row where County is "Chickasaw" and State is "Iowa"
+Nashua <- subset(Temp, County == "Chickasaw County" & State == "Iowa")
+# Find the columns for 2002 to 2014
+Nashua <- Nashua[, c("County", "State", matching_columns)]
+Nashua.avg <- mean(as.numeric(Nashua[3:length(Nashua)])) #7.62
+
+
+#4. Ames, Story  County, Iowa
+# Find the row where County is "Story" and State is "Iowa"
+Ames <- subset(Temp, County == "Story County" & State == "Iowa")
+# Find the columns for 2002 to 2014
+Ames <- Ames[, c("County", "State", matching_columns)]
+Ames.avg <- mean(as.numeric(Ames[3:length(Ames)])) #8.86
+
+#5. Armstrong, Emmet  County, Iowa
+# Find the row where County is "Emmet" and State is "Iowa"
+Armstrong <- subset(Temp, County == "Emmet County" & State == "Iowa")
+# Find the columns for 2002 to 2014
+Armstrong <- Armstrong[, c("County", "State", matching_columns)]
+Armstrong.avg <- mean(as.numeric(Armstrong[3:length(Armstrong)])) #7.55
+
+#6. McNay, Lucas  County, Iowa
+# Find the row where County is "Lucas" and State is "Iowa"
+McNay <- subset(Temp, County == "Lucas County" & State == "Iowa")
+# Find the columns for 2002 to 2014
+McNay <- McNay[, c("County", "State", matching_columns)]
+McNay.avg <- mean(as.numeric(McNay[3:length(McNay)])) #9.91
+
+#7. Crawfordsville, Washington   County, Iowa
+# Find the row where County is "Washington " and State is "Iowa"
+Crawfordsville <- subset(Temp, County == "Washington County" & State == "Iowa")
+# Find the columns for 2002 to 2014
+Crawfordsville <- Crawfordsville[, c("County", "State", matching_columns)]
+Crawfordsville.avg <- mean(as.numeric(Crawfordsville[3:length(Crawfordsville)])) #10.04
+```
+
+
+
+```{r Sainju et al., 2016; Sainju et al, 2014}
+#In this study the experiment period is 2005 fall -2014 fall
+#1. Nesson Valley
+Temp.avg("Williams","North Dakota", 2005, 2011) #4.76
+
+#2. Sidney 
+Temp.avg("Richland","Montana", 2006, 2011) #6.08
+```
+
+
+```{r Al-Kaisi et al., 2014}
+#In this study the experiment period is 2002-2011
+#Ames, Story  County, Iowa
+Temp.avg("Story","Iowa", 2002, 2011) #8.93
+
+```
+
+
+```{r Beniston et al., 2014; Nath et al., 2017}
+#In this study the experiment period is 1981-2012
+#Coshocton, Coshocton  County, Ohio
+Temp.avg("Coshocton","Ohio", 1981, 2012) #10.61
+
+```
+
+```{r Olson et al., 2013}
+#In this study the experiment period is 1988-2012
+#Simpsons, Johnson County, Illinois
+Temp.avg("Johnson","Illinois", 1988, 2012) #13.85
+```
+
+
+```{r Awale et al., 2013}
+#In this study the experiment period is 2008-2011 and 2005-2011
+#Fargo, Cass County, North Dakota
+Temp.avg("Cass","North Dakota", 2008, 2011) #4.61
+Temp.avg("Cass","North Dakota", 2005, 2011) #5.20
+
+```
+
+
+```{r Chatterjee et al., 2009}
+#In this study the experiment period is 1999-2008, and 1994-2008, 2003-2008, 1981-2008
+#Temperence, Monroe County, Michigan
+Temp.avg("Cass","Michigan", 1999, 2008) #9.94
+#Lenawee, Lenawee County, Michigan
+Temp.avg("Lenawee","Michigan", 1999, 2008) #9.50
+#Scioto, Scioto County, Ohio
+Temp.avg("Scioto","Ohio", 1994, 2008) #11.86
+#Canal Fulton, Stark County, Ohio
+Temp.avg("Stark","Ohio", 2003, 2008) #10.21
+#Salisbury, Somerset  County, Pennsylvania
+Temp.avg("Somerset","Pennsylvania", 1981, 2008) #8.35
+
+```
+
+
+
+```{r Blanco-Canqui et al., 2008}
+#In this study the experiment period is 2000-2007, 1998-2007, 1993-2007, 1995-2007, 1981-2007, 1998-2007, 2000-2007, 1988-2007, 2002-2007, 2003-2007
+#Georgetown, Scott County, Kentucky
+Temp.avg("Scott","Kentucky", 2000, 2007) #13.13
+#Glasgow, Barren County, Kentucky
+Temp.avg("Barren","Kentucky", 1998, 2007) #14.75
+#McKee, Jackson County, Kentucky
+Temp.avg("Jackson","Kentucky", 1993, 2007) #12.39
+#Fremont, Sandusky County, Ohio
+Temp.avg("Sandusky","Ohio", 1993, 2007) #10.10
+#Jackson, Jackson County, Ohio
+Temp.avg("Jackson","Ohio", 1995, 2007) #11.67
+#Canal Fulton, Stark County, Ohio
+Temp.avg("Stark","Ohio", 1981, 2007) #10.31
+#Grove city, Mercer  County, Pennsylvania
+Temp.avg("Mercer","Pennsylvania", 1998, 2007) #9.5
+#Greenville, Mercer  County, Pennsylvania
+Temp.avg("Mercer","Pennsylvania", 2000, 2007) #9.34
+#Troy, Bradford  County, Pennsylvania
+Temp.avg("Bradford","Pennsylvania", 1988, 2007) #8.13
+#Lewisburg, Union  County, Pennsylvania
+Temp.avg("Union","Pennsylvania", 2002, 2007) #9.86
+#Lancaster, Union  County, Pennsylvania
+Temp.avg("Lancaster","Pennsylvania", 2002, 2007) #11.86
+
+```
+
+
+```{r Sainju et al., 2007}
+#In this study the experiment period is 1983-2004
+#Culbertson, Roosevelt  County, Montana
+Temp.avg("Roosevelt","Montana", 1983, 2004) #5.84
+```
+
+
+```{r Dolan et al., 2006}
+#In this study the experiment period is 1980-2002
+#Rosemount, Dakota  County, Minnesota
+Temp.avg("Dakota","Minnesota", 1980, 2002) #7.38
+```
+
+```{r Jarecki et al., 2005}
+#In this study the experiment period is 1962-2003 , 1987-2003
+#South Charleston, Clark   County, Ohio
+Temp.avg("Clark","Ohio", 1981, 2003) #10.56
+
+#Hoytville, Wood  County, Ohio
+Temp.avg("Wood","Ohio", 1987, 2003) #10.02
+```
+
+
+```{r Puget et al., 2005}
+#In this study the experiment period is 1993-2001
+#Columbus, Franklin   County, Ohio
+Temp.avg("Franklin","Ohio", 1993, 2001) #11.35
+
+```
+
+
+```{r Al-Kaisi et al., 2005}
+# Ames, Story  County, Iowa, 1998-2001
+Temp.avg("Story","Iowa", 1998, 2001) #9.67
+```
+
+
+```{r Al-Kaisi et al., 2005}
+#Experiment period 1994 - 2000   and 1998-2000
+# Ames, Story  County, Iowa, 1994-2000
+Temp.avg("Story","Iowa", 1994, 2000) #8.79
+
+Temp.avg("Story","Iowa", 1998, 2000) #9.78
+
+#Kanawha, Hancock County, Iowa, 1994-2000
+Temp.avg("Hancock","Iowa", 1994, 2000) #7.53
+
+# Sutherland, O'Brien County, Iowa
+Temp.avg("O'Brien","Iowa", 1994, 2000) #7.65
+
+# Nashua, Chickasaw  County, Iowa
+Temp.avg("Chickasaw","Iowa", 1994, 2000) #7.77
+
+#Armstrong, Emmet  County, Iowa
+Temp.avg("Emmet","Iowa", 1994, 2000) #7.52
+
+#Crawfordsville, Washington   County, Iowa
+Temp.avg("Washington","Iowa", 1994, 2000) #10.21
+```
+
+
+```{r Halvorson et al., 2002}
+#Mandan ,Morton, North Dakota. 1983-1995
+Temp.avg("Morton","North Dakota", 1983, 1995) #5.91
+
+```
+
+
+```{r Yang et al., 1999}
+#Urbana ,Champaign, Illinois. 1983-1995
+Temp.avg("Champaign","Illinois", 1994, 1996) #10.42
+
+```
+
+
+### South States
+Below are the data for south states. I didn't calculate every in my dataset as Fernande has done that manually. I just checked them randomly. 
+
+```{r Sainju et al., 2002}
+#Fort Valley ,Peach, Georgia. 1995-1998
+Temp.avg("Peach","Georgia", 1995, 1997) #17.26
+
+
+#Sainju et al., 2005
+Temp.avg("Peach","Georgia", 1999, 2003) #17.73
+
+```
+
+
+```{r Sainju et al., 2002}
+#Ashland Bottoms ,Clark, Kansas. 1995-1998
+Temp.avg("Clark","Kansas", 1981, 2003) #13.45
+
+```
+
+
+```{r Gal et al., 2007}
+#Lafayette ,Tippecanoe, Indiana. 1995-1998
+Temp.avg("Tippecanoe","Indiana", 1981, 2003) #10.74
+
+```
+
+
+```{r Sainju et al., 2008}
+#Hays, Limestone, Alabama. 1996-2006
+Temp.avg("Limestone","Alabama", 1996, 2006) #15.77
+
+```
+
+
+```{r Blanco-Canqui et al., 2011}
+#Bell Mina, Ellis, Kansas. 1990-2013, 1968-2013, 1992-2013
+Temp.avg("Reno","Kansas", 1990, 2013) #13.41
+Temp.avg("Ellis","Kansas", 1981, 2013) #12.17
+Temp.avg("Greeley","Kansas", 1992, 2013) #11.33
+
+```
+
+
+
+```{r Terra et al., 2005}
+#Shorter, Macon, Alabama. 2000-2003
+Temp.avg("Macon","Alabama", 2000, 2003) #17.50
+```
