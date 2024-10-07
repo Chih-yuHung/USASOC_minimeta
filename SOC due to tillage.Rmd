@@ -1,0 +1,97 @@
+---
+title: "Tillage meta-analysis"
+author: "Dr. Chih-Yu Hung"
+date: "2024-08-06"
+output: html_document
+---
+
+## Objective
+
+This document will analyze SOC changes due to tillage management in the USA. 
+
+```{r preparation}
+library(tidyverse)
+library(ggplot2)
+
+data <- read.csv("Input/SOC tillage_US.csv", header = T)
+
+data.all <- data %>%
+  filter(Duration >=4)
+
+data.N <- data.all %>%
+  filter(Region == "North")%>%
+  mutate(Period = case_when(
+    Duration <= 10 ~ "Short",
+    Duration >10 & Duration <=20 ~ "Mideum",
+    Duration > 20 ~ "Long"))
+
+data.S <- data.all %>%
+  filter(Region == "South")%>%
+  mutate(Period = case_when(
+    Duration <= 10 ~ "Short",
+    Duration >10 & Duration <=20 ~ "Mideum",
+    Duration > 20 ~ "Long"))
+
+```
+
+
+```{r group data}
+#Only take duration >= 4
+data.N <- data.N  %>%
+  mutate(Period = case_when(
+    Duration <= 10 ~ "Short",
+    Duration >10 & Duration <=20 ~ "Mideum",
+    Duration > 20 ~ "Long"))
+
+average_north <- data.N %>%
+  group_by(Period) %>%
+  summarise(
+    avg_Duration = mean(Duration),
+    avg_Change_rate = mean(Change_rate)
+  )
+  
+
+
+
+
+data.S <- data.S %>%
+  mutate(Period = case_when(
+    Duration <= 10 ~ "Short",
+    Duration >10 & Duration <=20 ~ "Mideum",
+    Duration > 20 ~ "Long")) %>%
+    group_by(Period) 
+
+average_south <- data.S %>%
+  group_by(Period) %>%
+  summarise(
+    avg_Duration = mean(Duration),
+    avg_Change_rate = mean(Change_rate)
+  )
+  
+```
+
+
+
+```{r plot data}
+ggplot(data.N, aes(x=Duration,y=Change_rate, color = Period)) +
+  geom_point() +
+  ggtitle("Northern US") +
+  geom_point(data = average_north, aes(x = avg_Duration, y = avg_Change_rate), color = "black", size = 4, shape = 17) +  # Add average points
+  xlab("Duration") +
+  ylab("SOC change (kg C /ha /y)") +
+  theme_classic()
+  
+  
+
+ggplot(data.S, aes(x=Duration,y=Change_rate, color =Period)) +
+  geom_point() +
+  ggtitle("Southern US") +
+  geom_point(data = average_south, aes(x = avg_Duration, y = avg_Change_rate), color = "black", size = 4, shape = 17) +  # Add average points
+  xlab("Duration") +
+  ylab("SOC change (kg C /ha /y)") +
+  theme_classic()
+  
+
+
+
+```
