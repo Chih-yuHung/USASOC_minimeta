@@ -1,0 +1,188 @@
+---
+title: "SOC change due to tillage (CA NIR)"
+author: "Dr. Chih-Yu Hung"
+date: "2024-10-16"
+output: html_document
+---
+
+## Purpose
+
+We want to see the SOC changes in various Canada regions and soil textures. There are 9 regions and 3 soil textures. 
+
+```{r setup}
+library(tidyverse)
+library(ggplot2)
+library(RColorBrewer)
+library(writexl)
+
+CA_factor <- read.csv("Input/SOC tillage factor_CA.csv")
+```
+
+## Build a list for the total SOC from year 1 to year 100 (after practice change) in the 9 regions and 3 soil textures.
+
+```{r calculate SOC change}
+
+# Function to calculate SOC
+calculate_SOC <- function(LUMCMAX, Kval, year) {
+  SOC <- LUMCMAX * (1 - exp(-Kval * year))
+  return(SOC)
+}
+
+# Create a list to store results
+results <- list()
+
+# Calculate SOC for each Zone, Texture, and year
+for (i in 1:nrow(CA_factor)) {
+  zone <- CA_factor$Zone[i]
+  texture <- CA_factor$Texture[i]
+  Kval <- CA_factor$Kval[i]
+  LUMCMAX <- CA_factor$LUMCMAX[i]
+  
+  # Create a data frame for SOC over the years 1 to 100
+  SOC_values <- data.frame(
+    Year = 1:100,
+    SOC = sapply(1:100, function(year) calculate_SOC(LUMCMAX, Kval, year))
+  )
+  
+  # Store the SOC values in the list with Zone and Texture as keys
+  results[[paste(zone, texture, sep = "_")]] <- SOC_values
+}
+
+# Display the results for inspection
+results
+
+```
+
+
+
+
+```{r plot}
+# Combine all the results into a single data frame for plotting
+plot_data <- do.call(rbind, lapply(names(results), function(name) {
+  df <- results[[name]]
+  df$Combination <- name
+  return(df)
+}))
+
+# Create the plot
+ggplot(plot_data, aes(x = Year, y = SOC, color = Combination, linetype = Combination)) +
+  geom_line(size = 1) +
+  labs(
+    title = "SOC over Time for Di
+    fferent Zone and Texture Combinations",
+    x = "Year",
+    y = "SOC",
+    color = "Zone_Texture Combination",
+    linetype = "Zone_Texture Combination"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8),
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  ) +
+  scale_color_viridis_d() +
+  scale_linetype_manual(values = rep(1:6, length.out = 33))
+
+
+
+#Seperated by soil texture
+# Combine all the results into a single data frame for plotting, including Texture information
+plot_data_texture <- do.call(rbind, lapply(1:nrow(CA_factor), function(i) {
+  df <- results[[paste(CA_factor$Zone[i], CA_factor$Texture[i], sep = "_")]]
+  df$Zone <- CA_factor$Zone[i]
+  df$Texture <- CA_factor$Texture[i]
+  return(df)
+}))
+
+#Plot by texture
+plot_texture <- ggplot(plot_data_texture, aes(x = Year, y = SOC, color = Zone, linetype = Zone)) +
+  geom_line(size = 1.2) +  # Increase the line size for better visibility
+  labs(
+    title = "SOC over Time for Different Zone and Texture Combinations",
+    x = "Year",
+    y = "SOC",
+    color = "Zone",
+    linetype = "Zone"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8),
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  ) +
+  scale_color_manual(values = RColorBrewer::brewer.pal(11, "Set3")) +  # Use a palette with 11 distinct colors
+  facet_wrap(~Texture, ncol = 1, scales = "free_y") +
+  scale_linetype_manual(values = c("solid", "dashed", "dotted", "dotdash", "longdash", "twodash", 
+                                   "solid", "dashed", "dotted", "dotdash", "longdash"))  # 11 line types
+
+ggsave("Output/SOC_over_Time_by_Texture.png", plot = plot_texture, width = 10, height = 12, dpi = 300)
+```
+
+
+
+## Plot the change rate (delta SOC)
+
+```{r annual SOC change}
+
+deltaSOC <- lapply(results, function(df) {
+ # This is the average deltaSOC for the given years
+  df$deltaSOC <- c(df$SOC/df$Year) #
+  return(df)
+})
+
+save(deltaSOC, file="Output/deltaSOC_CA.R")
+
+write_xlsx(deltaSOC, path = "Output/DeltaSOC_CA.xlsx")
+
+
+```
+
+
+```{r relationship between coarse and fine soils}
+#To see if I can find a adjustment factor for Coarse texture soils
+# Function to add the factor columns and return a new list with only "_Coarse" data frames
+add_factors_and_filter <- function(data_list) {
+  # Create an empty list to store modified data frames with "_Coarse"
+  modified_data_list <- list()
+  
+  # Iterate over each dataframe in the list
+  for (df_name in names(data_list)) {
+    # Check if the data frame name ends with "_Coarse"
+    if (grepl("_Coarse$", df_name)) {
+      # Extract the base name (e.g., "Boreal Shield West")
+      base_name <- sub("_Coarse$", "", df_name)
+      
+      # Define the related data frames for Medium and Fine textures
+      medium_df_name <- paste0(base_name, "_Medium")
+      fine_df_name <- paste0(base_name, "_Fine")
+      
+      # Check if both the Medium and Fine data frames exist in the list
+      if (medium_df_name %in% names(data_list) && fine_df_name %in% names(data_list)) {
+        # Add factor_Medium and factor_Fine columns to the "_Coarse" dataframe
+        data_list[[df_name]]$factor_Medium <- data_list[[df_name]]$deltaSOC / data_list[[medium_df_name]]$deltaSOC
+        data_list[[df_name]]$factor_Fine <- data_list[[df_name]]$deltaSOC / data_list[[fine_df_name]]$deltaSOC
+        
+        # Store the modified "_Coarse" dataframe in the new list
+        modified_data_list[[df_name]] <- data_list[[df_name]]
+      }
+    }
+  }
+  
+  # Return the new list containing only "_Coarse" data frames with factors
+  return(modified_data_list)
+}
+
+# Apply the function to your list
+filtered_data_list <- add_factors_and_filter(deltaSOC)
+
+# Apply the function to your list and save it back to data_list
+data_list <- add_factors(deltaSOC)
+
+
+
+```

@@ -9,39 +9,141 @@ output: html_document
 
 This document will analyze SOC changes due to tillage management in the USA. 
 
+We have SOC changes (Mg C ha-1 y-1) in the US from publications. We need to prove that these empirical data matched the results from 
+
+
 ```{r preparation}
 library(tidyverse)
 library(ggplot2)
+library(maps)
+library(nlstools)
 
-data <- read.csv("Input/SOC tillage_US.csv", header = T)
+data.all <- read.csv("Input/SOC tillage_US.csv", header = T)
+#45 studies
+data.all.30 <- read.csv("Input/SOC tillage_US_30cm.csv",header =T )
 
-data.all <- data %>%
-  filter(Duration >=4)
+data <- data.all %>%
+  filter(Duration >= 3) %>%
+  filter(Crop.type == "Annual") %>%
+  filter(CT >0) %>%
+  filter(SOC_Depth >=150)
+#sort(unique(data$Article.title))   #40 studies, 244 obs
 
-data.N <- data.all %>%
+data.30 <- data.all.30 %>%
+  filter(Duration >= 3) %>%
+  filter(Crop.type == "Annual") %>%
+  filter(CT >0)
+
+
+#Convert soil texture to three texture system
+data <- data %>%
+  mutate(Soil.texture =
+  case_when(tolower(str_trim(Texture)) %in% c("clay", "silty clay", "silty clay loam", "clay loam", "sandy clay") ~ "Fine",
+            tolower(str_trim(Texture)) %in% c("sandy loam","sandy clay loam","loam soil", "loam", "silt loam", "silt") ~ "Medium",
+            TRUE ~ "Coarse")
+  )
+
+data.30 <- data.30 %>%
+  mutate(Soil.texture =
+  case_when(tolower(str_trim(Texture)) %in% c("clay", "silty clay", "silty clay loam", "clay loam", "sandy clay") ~ "Fine",
+            tolower(str_trim(Texture)) %in% c("sandy loam","sandy clay loam","loam soil", "loam", "silt loam", "silt") ~ "Medium",
+            TRUE ~ "Coarse")
+  )
+
+
+#See the texture numbers
+table(data$Soil.texture) #Fine 102, Medium 142 
+table(data.30$Soil.texture) #Fine 57, Medium 128
+
+# Filter data, separate to two groups North and South and group them to three duration, short, medium and long
+data.N <- data %>%
   filter(Region == "North")%>%
   mutate(Period = case_when(
     Duration <= 10 ~ "Short",
     Duration >10 & Duration <=20 ~ "Mideum",
     Duration > 20 ~ "Long"))
 
-data.S <- data.all %>%
+#See the texture number in North states
+table(data.N$Soil.texture) #Fine 79, Medium 100
+
+data.S <- data %>%
   filter(Region == "South")%>%
   mutate(Period = case_when(
     Duration <= 10 ~ "Short",
     Duration >10 & Duration <=20 ~ "Mideum",
     Duration > 20 ~ "Long"))
+#See the texture number
+table(data.S$Soil.texture) #Fine 23, Medium 42
+
+
+#Filter data to soil texture
+data.Fine <- data %>%
+  filter(Soil.texture == "Fine") %>%
+  filter(Change_rate >= 0)
+
+data.Medium <- data %>%
+  filter(Soil.texture == "Medium") %>%
+  filter(Change_rate >= 0)
+
 
 ```
 
+#To see the clay content and the SOC changes for the coarse texture part. 
+
+
+
+```{r US map to see data distribution}
+# Assuming your dataframe is named "data" with a column "State"
+# Count the number of occurrences per state
+state_counts <- data %>%
+  group_by(State) %>%
+  summarize(Count = n())
+
+# Get U.S. state map data
+us_states <- map_data("state")
+
+# Make sure the State names in your data match the map data format
+state_counts$State <- tolower(state_counts$State)
+
+# Calculate the centroids for each state to get long and lat
+state_centroids <- us_states %>%
+  group_by(region) %>%
+  summarize(long = mean(range(long)), lat = mean(range(lat)))
+
+# Merge the state centroids with the counts
+state_counts <- state_counts %>%
+  inner_join(state_centroids, by = c("State" = "region"))
+
+# Plot the map
+ggplot() +
+  # Draw the U.S. state map
+  geom_polygon(data = us_states, aes(x = long, y = lat, group = group),
+               fill = "lightgray", color = "white") +
+  # Add bubbles sized by the count
+  geom_point(data = state_counts, aes(x = long, y = lat, size = Count),
+             color = "blue", alpha = 0.6) +
+  scale_size(range = c(1, 10), name = "Data Count") + # Adjust the range for bubble sizes
+  labs(title = "Data Counts by State",
+       x = "Longitude", y = "Latitude") +
+  theme_minimal()
+
+#To check data availablilty in the West
+# data.west<- data %>%
+#   filter(State %in% c("Montana", "Texas", "North Dakota")) %>%
+#   filter(Soil.texture == "Medium")
+```
+
+find the statistic for production/area to see I cover 80% 
+
+Repeated measurement and non-repeated measurement
+
+
+
+
+
+## To check the average SOC change values in each durations
 
 ```{r group data}
-#Only take duration >= 4
-data.N <- data.N  %>%
-  mutate(Period = case_when(
-    Duration <= 10 ~ "Short",
-    Duration >10 & Duration <=20 ~ "Mideum",
-    Duration > 20 ~ "Long"))
 
 average_north <- data.N %>%
   group_by(Period) %>%
@@ -50,16 +152,6 @@ average_north <- data.N %>%
     avg_Change_rate = mean(Change_rate)
   )
   
-
-
-
-
-data.S <- data.S %>%
-  mutate(Period = case_when(
-    Duration <= 10 ~ "Short",
-    Duration >10 & Duration <=20 ~ "Mideum",
-    Duration > 20 ~ "Long")) %>%
-    group_by(Period) 
 
 average_south <- data.S %>%
   group_by(Period) %>%
@@ -70,7 +162,24 @@ average_south <- data.S %>%
   
 ```
 
+```{r linear regression}
 
+ggplot(data, aes(x = CT, y = NT)) +
+  geom_point() +  # Plot the data points
+  geom_smooth(method = "lm", formula = y ~ x + 0, color = "blue", se = TRUE) +  # Linear regression without intercept
+  labs(
+    title = "Linear Regression of NT vs CT (No Intercept)",
+    x = "CT",
+    y = "NT"
+  ) +
+  stat_poly_eq(
+    formula = y ~ x + 0,
+    aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+    parse = TRUE,
+    coef.digits = 3
+  ) +
+  theme_minimal()
+```
 
 ```{r plot data}
 ggplot(data.N, aes(x=Duration,y=Change_rate, color = Period)) +
@@ -95,3 +204,73 @@ ggplot(data.S, aes(x=Duration,y=Change_rate, color =Period)) +
 
 
 ```
+
+
+
+
+```{r fit exponential decay models}
+
+plot_exponential_decay <- function(data, max_C = 100, rate = 0.02) {
+  library(ggplot2)
+  library(nlstools)
+  y_col <- "Change_rate"
+  t_col <- "Duration"
+  # Fit the model using nls with default start values if not provided
+  fit <- nls(as.formula(paste(y_col, "~ a * exp(-k *", t_col, ")")),
+             data = data, start = list(a = max_C, k = rate))
+  
+  # Extract the coefficients
+  a <- coef(fit)["a"]
+  k <- coef(fit)["k"]
+  
+  # Generate predictions and confidence intervals
+  prediction_data <- data.frame(t_col = seq(min(data[[t_col]]), max(data[[t_col]]), length.out = 100))
+  colnames(prediction_data)[1] <- t_col  # Set dynamic column name
+  prediction_data$predicted <- predict(fit, newdata = prediction_data)
+  
+  # Get parameter confidence intervals
+  conf <- confint2(fit, level = 0.95)
+  a_upper <- conf["a", "97.5 %"]
+  a_lower <- conf["a", "2.5 %"]
+  k_upper <- conf["k", "97.5 %"]
+  k_lower <- conf["k", "2.5 %"]
+  
+  # Calculate upper and lower bounds for confidence interval
+  prediction_data$upper <- a_upper * exp(-k_lower * prediction_data[[t_col]])
+  prediction_data$lower <- a_lower * exp(-k_upper * prediction_data[[t_col]])
+  
+  # Calculate RMSE and sMAPE
+  data$predicted <- predict(fit)
+  rmse <- sqrt(mean((data[[y_col]] - data$predicted)^2))
+  sMAPE <- mean(2 * abs(data[[y_col]] - data$predicted) / (abs(data[[y_col]]) + abs(data$predicted))) * 100
+  
+  # Create labels for equation and metrics
+  equation_label <- paste0("y = ", round(a, 3), " * exp(-", round(k, 3), " * t)")
+  rmse_label <- paste0("RMSE = ", round(rmse, 3))
+  sMAPE_label <- paste0("sMAPE = ", round(sMAPE, 2), "%")
+  
+# Plot with confidence interval and labels
+  ggplot(data, aes_string(x = t_col, y = y_col)) +
+    geom_point() +  # Plot data points
+    geom_line(data = prediction_data, aes_string(x = t_col, y = "predicted"), color = "blue") +  # Fitted curve
+   # geom_ribbon(data = prediction_data, aes_string(x = t_col, ymin = "lower", ymax = "upper"), alpha = 0.2) +  # Confidence interval
+    labs(
+      title = "Exponential Decay Fit with 95% Confidence Interval",
+      x = t_col,
+      y = y_col
+    ) +
+    annotate("text", x = Inf, y = Inf, label = equation_label, hjust = 1.1, vjust = 2, size = 4) +
+    annotate("text", x = Inf, y = Inf, label = rmse_label, hjust = 1.1, vjust = 3.5, size = 4) +
+    annotate("text", x = Inf, y = Inf, label = sMAPE_label, hjust = 1.1, vjust = 5, size = 4) +
+    theme_minimal()
+}
+
+# Usage example:
+# plot_exponential_decay(data, y_col = "Change_rate", t_col = "Duration")
+
+plot
+
+plot_exponential_decay(data.30)
+
+```
+
