@@ -154,7 +154,7 @@ state_counts <- state_counts %>%
   inner_join(state_centroids, by = c("State" = "region"))
 
 # Plot the map
-ggplot() +
+data_map <- ggplot() +
   # Draw the U.S. state map
   geom_polygon(data = us_states, aes(x = long, y = lat, group = group),
                fill = "lightgray", color = "white") +
@@ -165,6 +165,8 @@ ggplot() +
   labs(title = "Data Counts by State",
        x = "Longitude", y = "Latitude") +
   theme_minimal()
+
+ggsave(data_map,filename = "Output/data_map.png", width = 16, height = 9)
 
 #To check data availablilty in the West
 # data.west<- data %>%
@@ -179,9 +181,9 @@ US_table <- data %>%
   mutate(Reference = paste0(sub(" .*", "", Reference), " et al.")) %>%
   summarise(
     State = str_c(unique(State), collapse = ", "),
-    Region = str_c(unique(Region), collapse = ", "),
+    #Region = str_c(unique(Region), collapse = ", "),
     texture = str_c(unique(Soil.texture), collapse = ", "),
-    crop = str_c(unique(Crop), collpase =", ")
+    #crop = str_c(unique(Crop), collpase =", ")
   ) %>%
   ungroup()
 
