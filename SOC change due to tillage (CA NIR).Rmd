@@ -20,6 +20,7 @@ CA_factor <- read.csv("Input/SOC tillage factor_CA.csv")
 
 ## Build a list for the total SOC from year 1 to year 100 (after practice change) in the 9 regions and 3 soil textures.
 
+### Unit for deltaSOC, g C m-2, need to x 10 kg g-1 m-2 ha-1 to be kg C ha-1 
 ```{r calculate SOC change}
 
 # Function to calculate SOC
@@ -49,12 +50,13 @@ for (i in 1:nrow(CA_factor)) {
 }
 
 # Display the results for inspection
-results
+results 
 
 ```
 
 
 
+## Plot the SOC increase after turn to non-till in Canada 
 
 ```{r plot}
 # Combine all the results into a single data frame for plotting
@@ -125,19 +127,59 @@ ggsave("Output/SOC_over_Time_by_Texture.png", plot = plot_texture, width = 10, h
 
 
 
-## Plot the change rate (delta SOC)
+## Calculate Avg. delta SOC to compare my results from US data
 
 ```{r annual SOC change}
+#This results should be comparable to my meta analysis in US
 
 deltaSOC <- lapply(results, function(df) {
  # This is the average deltaSOC for the given years
-  df$deltaSOC <- c(df$SOC/df$Year) #
+  df$deltaSOC_Avg <- c(df$SOC*10/df$Year) #convert to kg C ha-1
   return(df)
 })
 
-save(deltaSOC, file="Output/deltaSOC_CA.R")
+save(deltaSOC, file="Output/deltaSOC_CA.RData")
 
-write_xlsx(deltaSOC, path = "Output/DeltaSOC_CA.xlsx")
+#write_xlsx(deltaSOC, path = "Output/DeltaSOC_CA.xlsx")
+
+
+#To see the avg for each period
+calculate_period_avgs <- function(df) {
+  df <- df %>%
+    filter(Year >= 3 & Year <= 50) %>%  # Keep only rows within the range
+    mutate(
+      Period = case_when(
+        Year >= 3 & Year <= 10 ~ "short",
+        Year >= 11 & Year <= 20 ~ "medium",
+        Year >= 21 & Year <= 50 ~ "long",
+      )
+    ) %>%
+    group_by(Period) %>%
+    summarise(avg_deltaSOC_Avg = round(mean(deltaSOC_Avg, na.rm = TRUE),1), .groups = "drop")
+  
+  return(df)
+}
+
+# Apply the function to each data frame in the list
+results_list <- lapply(deltaSOC, calculate_period_avgs)
+
+# Combine all results into a single summary table
+final_results <- bind_rows(results_list, .id = "DataFrame")
+
+
+# Pivot the table to have Period as columns
+pivoted_results <- final_results %>%
+  pivot_wider(
+    names_from = Period,
+    values_from = avg_deltaSOC_Avg,
+    values_fill = NA  # Fill missing combinations with NA
+  )
+
+# Inspect the final results
+print(final_results)
+
+
+
 
 
 ```

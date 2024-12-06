@@ -18,82 +18,121 @@ library(ggplot2)
 library(maps)
 library(nlstools)
 
-data.all <- read.csv("Input/SOC tillage_US.csv", header = T)
+# data.all <- read.csv("Input/SOC tillage_US.csv", header = T)
 #45 studies
+
+#Add them into West and Eastern group. 
+West<- c("Washington", "Oregon", "California", "Idaho", "Montana", "Wyoming",
+         "Nevada", "Utah", "Arizona", "Colorado", "New Mexico", "North Dakota", "South Dakota", 
+         "Nebraska", "Kansas", "Oklahoma", "Texas")
+
+# data.all <- data.all %>%
+#   mutate(WE = case_when(
+#     State %in% West ~ "West",
+#    TRUE ~ "East"
+#   ))
+
+#Filter data usable in our analysis
+# data <- data.all %>%
+#   filter(Duration >= 3) %>%
+#   filter(Crop.type == "Annual") %>%
+#   filter(CT >0) %>%
+#   filter(SOC_Depth >=150) %>%
+#   filter(Change_rate <= 3000)
+#sort(unique(data$Article.title))   #40 studies, 244 obs, or 233 if remove over 3000
+
 data.all.30 <- read.csv("Input/SOC tillage_US_30cm.csv",header =T )
-
-data <- data.all %>%
-  filter(Duration >= 3) %>%
-  filter(Crop.type == "Annual") %>%
-  filter(CT >0) %>%
-  filter(SOC_Depth >=150)
-#sort(unique(data$Article.title))   #40 studies, 244 obs
-
+#It's a subdata set that only has studies with SOC 30 cm depth
 data.30 <- data.all.30 %>%
   filter(Duration >= 3) %>%
   filter(Crop.type == "Annual") %>%
-  filter(CT >0)
+  filter(CT >0) %>%
+  filter(SOC_Depth >=150) %>%
+  mutate(WE = case_when(
+    State %in% West ~ "West",
+   TRUE ~ "East")) %>%
+  filter(Change_rate <= 3000)
+  
 
+#Only do this if we want to use 30 cm only
+data <- data.30
 
 #Convert soil texture to three texture system
+#I'm moving sandy loam to coarse. based on this article Gauthier et al., 2023 https://doi.org/10.1139/cjss-2022-0116
 data <- data %>%
   mutate(Soil.texture =
-  case_when(tolower(str_trim(Texture)) %in% c("clay", "silty clay", "silty clay loam", "clay loam", "sandy clay") ~ "Fine",
-            tolower(str_trim(Texture)) %in% c("sandy loam","sandy clay loam","loam soil", "loam", "silt loam", "silt") ~ "Medium",
-            TRUE ~ "Coarse")
-  )
-
-data.30 <- data.30 %>%
-  mutate(Soil.texture =
-  case_when(tolower(str_trim(Texture)) %in% c("clay", "silty clay", "silty clay loam", "clay loam", "sandy clay") ~ "Fine",
-            tolower(str_trim(Texture)) %in% c("sandy loam","sandy clay loam","loam soil", "loam", "silt loam", "silt") ~ "Medium",
-            TRUE ~ "Coarse")
-  )
-
-
-#See the texture numbers
-table(data$Soil.texture) #Fine 102, Medium 142 
-table(data.30$Soil.texture) #Fine 57, Medium 128
-
-# Filter data, separate to two groups North and South and group them to three duration, short, medium and long
-data.N <- data %>%
-  filter(Region == "North")%>%
+  case_when(tolower(str_trim(Texture)) %in% 
+              c("clay", "silty clay", "silty clay loam", "clay loam", "sandy clay") ~ "Fine",
+            tolower(str_trim(Texture)) %in% 
+              c("sandy clay loam","loam soil", "loam", "silt loam", "silt") ~ "Medium",
+            TRUE ~ "Coarse")) %>%
   mutate(Period = case_when(
     Duration <= 10 ~ "Short",
-    Duration >10 & Duration <=20 ~ "Mideum",
-    Duration > 20 ~ "Long"))
+    Duration >10 & Duration <=20 ~ "Medium",
+    Duration > 20 ~ "Long")
+  )
 
-#See the texture number in North states
-table(data.N$Soil.texture) #Fine 79, Medium 100
-
-data.S <- data %>%
-  filter(Region == "South")%>%
-  mutate(Period = case_when(
-    Duration <= 10 ~ "Short",
-    Duration >10 & Duration <=20 ~ "Mideum",
-    Duration > 20 ~ "Long"))
-#See the texture number
-table(data.S$Soil.texture) #Fine 23, Medium 42
 
 
 #Filter data to soil texture
 data.Fine <- data %>%
-  filter(Soil.texture == "Fine") %>%
-  filter(Change_rate >= 0)
+  filter(Soil.texture == "Fine")
 
 data.Medium <- data %>%
-  filter(Soil.texture == "Medium") %>%
-  filter(Change_rate >= 0)
+  filter(Soil.texture == "Medium")
 
+data.Coarse <- data %>%
+  filter(Soil.texture == "Coarse")
+
+#See the texture numbers
+table(data$Soil.texture) #Fine 102, Medium 142; for 30 cm data: Fine 57, Medium 103, Coarse 20
+
+# Filter data, separate to two groups North and South and group them to three duration, short, medium and long
+data.Fine.N <- data.Fine %>%
+  filter(Region == "North")#79 obs; for 30cm 34 obs
+
+data.Medium.N <- data.Medium %>%
+  filter(Region == "North")  #100 obs; for 30cm 79obs
+
+data.Coarse.N <- data.Coarse %>%
+  filter(Region == "North")  #X obs; for 30cm 2obs
+
+data.Fine.S <- data.Fine %>%
+  filter(Region == "South") #23 obs; for 30cm 23 obs
+
+data.Medium.S <- data.Medium %>%
+  filter(Region == "South") #42 obs; for 30cm 24 obs. It's like to increase, can check later
+
+data.Coarse.S <- data.Coarse %>%
+  filter(Region == "South") #X obs; for 30cm 18 obs
+
+#Separate to West and East group
+data.Fine.W <- data.Fine %>%
+  filter(WE == "West") #21 obs; for 30cm 21 obs
+
+data.Medium.W <- data.Medium %>%
+  filter(WE == "West") #23 obs; for 30cm 14 obs
+
+data.Coarse.W <- data.Coarse %>%
+  filter(WE == "West") #X obs; for 30cm 1 obs
+
+
+data.Fine.E <- data.Fine %>%
+  filter(WE == "East") #81 obs; for 30cm 36 obs
+
+data.Medium.E <- data.Medium %>%
+  filter(WE == "East") #119 obs; for 30cm 89obs
+
+data.Coarse.E <- data.Coarse %>%
+  filter(WE == "East") #X obs; for 30cm 19obs
 
 ```
 
-#To see the clay content and the SOC changes for the coarse texture part. 
-
-
+ 
+## US map for data distribution
+We can see most data in Iowa and Texa. Corn belt and Southern plain have most of data.
 
 ```{r US map to see data distribution}
-# Assuming your dataframe is named "data" with a column "State"
 # Count the number of occurrences per state
 state_counts <- data %>%
   group_by(State) %>%
@@ -122,7 +161,7 @@ ggplot() +
   # Add bubbles sized by the count
   geom_point(data = state_counts, aes(x = long, y = lat, size = Count),
              color = "blue", alpha = 0.6) +
-  scale_size(range = c(1, 10), name = "Data Count") + # Adjust the range for bubble sizes
+  scale_size(range = c(1,10), name = "Data Count") + # Adjust the range for bubble sizes
   labs(title = "Data Counts by State",
        x = "Longitude", y = "Latitude") +
   theme_minimal()
@@ -133,99 +172,182 @@ ggplot() +
 #   filter(Soil.texture == "Medium")
 ```
 
-find the statistic for production/area to see I cover 80% 
+```{r output file for annex 2}
 
-Repeated measurement and non-repeated measurement
+US_table <- data %>%
+  group_by(Reference, Pub_year) %>%
+  mutate(Reference = paste0(sub(" .*", "", Reference), " et al.")) %>%
+  summarise(
+    State = str_c(unique(State), collapse = ", "),
+    Region = str_c(unique(Region), collapse = ", "),
+    texture = str_c(unique(Soil.texture), collapse = ", "),
+    crop = str_c(unique(Crop), collpase =", ")
+  ) %>%
+  ungroup()
+
+#write.csv(US_table,"Output/Study summary.csv",row.names = F)
 
 
-
-
+```
 
 ## To check the average SOC change values in each durations
+  The three duration are "3-10 year", "11-20 years" and ">21 years"
 
 ```{r group data}
-
-average_north <- data.N %>%
-  group_by(Period) %>%
-  summarise(
-    avg_Duration = mean(Duration),
-    avg_Change_rate = mean(Change_rate)
-  )
+#A function to calculate the grouped avg. 
+group_avg <- function(data, group_col, summary_cols) {
+  summarized_data <- data %>%
+    group_by(across(all_of(group_col))) %>%
+    summarise(
+      across(
+        all_of(summary_cols),
+        list(avg = ~ round(mean(.x, na.rm = TRUE), 1)), # Round to 1 decimal
+        .names = "avg_{col}"
+      )
+    )
+  return(summarized_data)
+}
   
 
-average_south <- data.S %>%
-  group_by(Period) %>%
-  summarise(
-    avg_Duration = mean(Duration),
-    avg_Change_rate = mean(Change_rate)
+# Define a function to calculate averages for each data frame in the list and combine results
+process_list_to_table <- function(data_list, group_col, summary_cols) {
+  library(dplyr)
+  
+  # Identify all unique groups (Periods) across all data frames
+  all_groups <- unique(unlist(lapply(data_list, function(df) unique(df[[group_col]]))))
+  
+  # Apply the calculate_group_averages function to each data frame in the list
+  results <- lapply(names(data_list), function(df_name) {
+    data <- data_list[[df_name]]
+    avg_data <- group_avg(data, group_col, summary_cols)
+    avg_data <- avg_data %>%
+      mutate(DataFrame = df_name) # Add a column to indicate the source data frame
+  
+  # Define the groups in a reference data.frame
+  reference_df <- data.frame(group_col = all_groups)
+
+  # Perform a full join
+  avg_data <- merge(
+  reference_df,
+  avg_data,
+  by.x = "group_col", 
+  by.y = group_col,
+  all.x = TRUE
   )
+    
+      return(avg_data)
+  })
+  
+  # Combine all results into a single table
+  combined_table <- bind_rows(results)
+  
+  return(combined_table)
+}
+
+#List all data frame
+data_group <- mget(c("data.Fine.E", "data.Fine.W", "data.Fine.S", "data.Fine.N",
+                    "data.Medium.E", "data.Medium.W", "data.Medium.S", "data.Medium.N",
+                    "data.Coarse.E", "data.Coarse.W", "data.Coarse.S", "data.Coarse.N",
+                    "data.Fine","data.Medium","data.Coarse","data"))
+
+
+
+#Combine all results
+combined_results <- process_list_to_table(
+  data_list = data_group, 
+  group_col = "Period", 
+  summary_cols = c("Duration", "Change_rate")
+)
+
+#Organize
+US_results <- combined_results %>%
+  rename(
+    Group = DataFrame,
+    Period = group_col,
+    Avg_Duration = avg_Duration,
+    Avg_Change_rate = avg_Change_rate
+  ) %>%
+  select(Group, everything())  # Move "Group" to the first column
+
+#write.csv(US_results,"Output/US average_30cm.csv", row.names = FALSE)
+
+#Legacy code, just for simple example to show what I did for the combineed_results
+# average_Fine_N <- data.Fine.N %>%
+#   group_by(Period) %>%
+#   summarise(
+#     avg_Duration = mean(Duration),
+#     avg_Change_rate = mean(Change_rate)
+#   )
+
+
   
 ```
+
+
+## The linear regressiob between NT and CT
+I found the nontill practice hardly change deltaSOC. They are similiar to conventioanl tillage.
 
 ```{r linear regression}
 
 ggplot(data, aes(x = CT, y = NT)) +
   geom_point() +  # Plot the data points
   geom_smooth(method = "lm", formula = y ~ x + 0, color = "blue", se = TRUE) +  # Linear regression without intercept
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey") + 
   labs(
     title = "Linear Regression of NT vs CT (No Intercept)",
     x = "CT",
     y = "NT"
   ) +
-  stat_poly_eq(
-    formula = y ~ x + 0,
-    aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
-    parse = TRUE,
-    coef.digits = 3
-  ) +
   theme_minimal()
 ```
-
-```{r plot data}
-ggplot(data.N, aes(x=Duration,y=Change_rate, color = Period)) +
-  geom_point() +
-  ggtitle("Northern US") +
-  geom_point(data = average_north, aes(x = avg_Duration, y = avg_Change_rate), color = "black", size = 4, shape = 17) +  # Add average points
-  xlab("Duration") +
-  ylab("SOC change (kg C /ha /y)") +
-  theme_classic()
-  
-  
-
-ggplot(data.S, aes(x=Duration,y=Change_rate, color =Period)) +
-  geom_point() +
-  ggtitle("Southern US") +
-  geom_point(data = average_south, aes(x = avg_Duration, y = avg_Change_rate), color = "black", size = 4, shape = 17) +  # Add average points
-  xlab("Duration") +
-  ylab("SOC change (kg C /ha /y)") +
-  theme_classic()
-  
-
-
-
-```
-
-
 
 
 ```{r fit exponential decay models}
 
-plot_exponential_decay <- function(data, max_C = 100, rate = 0.02) {
+plot_exponential_decay <- function(data, data_name, max_C = NULL, rate = NULL, US_results = NULL) {
   library(ggplot2)
   library(nlstools)
+  
   y_col <- "Change_rate"
   t_col <- "Duration"
-  # Fit the model using nls with default start values if not provided
-  fit <- nls(as.formula(paste(y_col, "~ a * exp(-k *", t_col, ")")),
-             data = data, start = list(a = max_C, k = rate))
   
-  # Extract the coefficients
+  # Omit NA values
+  data <- na.omit(data[c(y_col, t_col)])
+  
+  if (nrow(data) == 0) {
+    stop("Filtered data is empty; skipping model fitting.")
+  }
+  
+  # Dynamically calculate initial values if not provided
+  max_C <- if (is.null(max_C)) max(data[[y_col]], na.rm = TRUE) else max_C
+  half_max_time <- if (length(data[[t_col]]) > 0) {
+    data[[t_col]][which.min(abs(data[[y_col]] - max_C / 2))]
+  } else {
+    NA
+  }
+  rate <- if (is.null(rate)) {
+    if (!is.na(half_max_time) && is.finite(1 / half_max_time)) {
+      1 / half_max_time
+    } else {
+      0.01  # Default value
+    }
+  } else rate
+  
+  # Fit the model using nls with error handling
+  fit <- tryCatch({
+    nls(as.formula(paste(y_col, "~ a *exp(-k *", t_col, ")")),
+        data = data, start = list(a = max_C, k = rate))
+  }, error = function(e) {
+    message("Error in nls fitting: ", e$message)
+    return(NULL)
+  })
+  if (is.null(fit)) return(NULL)
+  
+  # Extract coefficients and predictions
   a <- coef(fit)["a"]
   k <- coef(fit)["k"]
-  
-  # Generate predictions and confidence intervals
-  prediction_data <- data.frame(t_col = seq(min(data[[t_col]]), max(data[[t_col]]), length.out = 100))
-  colnames(prediction_data)[1] <- t_col  # Set dynamic column name
+  prediction_data <- data.frame(t_col = seq(1, 50, length.out = 50))
+  colnames(prediction_data)[1] <- t_col  
   prediction_data$predicted <- predict(fit, newdata = prediction_data)
   
   # Get parameter confidence intervals
@@ -249,28 +371,73 @@ plot_exponential_decay <- function(data, max_C = 100, rate = 0.02) {
   rmse_label <- paste0("RMSE = ", round(rmse, 3))
   sMAPE_label <- paste0("sMAPE = ", round(sMAPE, 2), "%")
   
-# Plot with confidence interval and labels
-  ggplot(data, aes_string(x = t_col, y = y_col)) +
-    geom_point() +  # Plot data points
-    geom_line(data = prediction_data, aes_string(x = t_col, y = "predicted"), color = "blue") +  # Fitted curve
-   # geom_ribbon(data = prediction_data, aes_string(x = t_col, ymin = "lower", ymax = "upper"), alpha = 0.2) +  # Confidence interval
+  # Match points from US_results based on data_name
+  if (!is.null(US_results) && !is.null(data_name)) {
+    matched_points <- US_results[US_results$Group == data_name, ]
+  } else {
+    matched_points <- NULL
+  }
+  
+  # Plot with updated ggplot2 syntax
+  ggplot(prediction_data, aes(x = .data[[t_col]], y = predicted)) +
+    geom_line(color = "blue") +
+    geom_line(aes(x = .data[[t_col]], y = upper), color = "grey") +
+    geom_line(aes(x = .data[[t_col]], y = lower), color = "grey") +
+    
+    # Observation data
+    geom_point(data = data, aes(x = .data[[t_col]], y = .data[[y_col]], color = "Observation"), shape = 16) +
+    
+    # Average data
+    geom_point(data = matched_points, aes(x = Avg_Duration, y = Avg_Change_rate, color = "Average"), shape = 17) +
+    
+    scale_color_manual(
+      values = c("Observation" = "black", "Average" = "red"),
+      name = "Legend"
+    ) +
+    
     labs(
-      title = "Exponential Decay Fit with 95% Confidence Interval",
+      title = "Exponential Decay Fit",
       x = t_col,
       y = y_col
     ) +
+    
     annotate("text", x = Inf, y = Inf, label = equation_label, hjust = 1.1, vjust = 2, size = 4) +
     annotate("text", x = Inf, y = Inf, label = rmse_label, hjust = 1.1, vjust = 3.5, size = 4) +
     annotate("text", x = Inf, y = Inf, label = sMAPE_label, hjust = 1.1, vjust = 5, size = 4) +
-    theme_minimal()
+    
+    theme_classic() +
+    
+    # Position the legend to the left of the annotations
+    theme(
+      legend.position = c(0.5, 0.85), # Adjust coordinates for fine-tuning
+      legend.justification = "center",
+      legend.background = element_rect(fill = "white", color = "black")
+    )
 }
 
-# Usage example:
-# plot_exponential_decay(data, y_col = "Change_rate", t_col = "Duration")
 
-plot
 
-plot_exponential_decay(data.30)
+
+#Remove all negative values for fitting
+data_group <- lapply(data_group, function(df){
+  df <- df[df$Change_rate >= 0, ]
+  return(df)
+})
+
+
+
+plots <- lapply(names(data_group), function(name) {
+  plot_exponential_decay(data = data_group[[name]], 
+                         data_name = name, 
+                         US_results = US_results)
+})
+
+
+for (i in seq_along(plots)) {
+  ggsave(filename = paste0("Output/plot_30cm_", names(data_group)[i], ".png"), plot = plots[[i]], width = 8, height = 6)
+}
+
+
 
 ```
 
